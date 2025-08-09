@@ -217,16 +217,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
     }
   }
 
-  /// Smoothly scrolls to the bottom of the student list
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
+
 
   /// Smoothly scrolls to the top of the student list
   void _scrollToTop() {
@@ -606,14 +597,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
     showDialog(
       context: context,
       builder: (context) => AddStudentDialog(classId: classId),
-    ).then((result) {
-      // If a student was added, scroll to bottom to show the new student
-      if (result == true) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
-        });
-      }
-    });
+    );
   }
 
   void _showEditStudentDialog(

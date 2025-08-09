@@ -36,10 +36,19 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> with 
   AttendanceSession? _selectedSession;
   List<Map<String, dynamic>> _attendanceRecords = [];
   
+  // Month filtering state variables
+  DateTime? _selectedMonth;
+  List<DateTime> _availableMonths = [];
+  
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    
+    // Initialize month filtering state variables
+    _selectedMonth = null;
+    _availableMonths = [];
+    
     _loadData();
   }
   
@@ -168,6 +177,109 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> with 
     return _attendanceRecords
         .where((record) => record['student_id'] == _selectedStudentId)
         .toList();
+  }
+  
+  /// Extracts unique months from attendance records for the selected student
+  /// Returns months sorted in chronological order (most recent first)
+  List<DateTime> _extractAvailableMonths(List<Map<String, dynamic>> attendanceRecords) {
+    if (attendanceRecords.isEmpty) {
+      return [];
+    }
+    
+    try {
+      // Extract unique months from attendance records
+      final Set<DateTime> monthsSet = {};
+      
+      for (final record in attendanceRecords) {
+        final dateStr = record['session_date'] as String?;
+        if (dateStr != null) {
+          final date = DateTime.parse(dateStr);
+          // Create a DateTime representing the first day of the month
+          final monthDate = DateTime(date.year, date.month, 1);
+          monthsSet.add(monthDate);
+        }
+      }
+      
+      // Convert to list and sort in chronological order (most recent first)
+      final monthsList = monthsSet.toList();
+      monthsList.sort((a, b) => b.compareTo(a)); // Descending order (most recent first)
+      
+      return monthsList;
+    } catch (e) {
+      // Handle errors in month extraction
+      debugPrint('Error extracting available months: $e');
+      _showFilteringError('month extraction');
+      return [];
+    }
+  }
+  
+  /// Filters attendance records by the selected month
+  /// Returns all records if no month is selected (null)
+  List<Map<String, dynamic>> _getFilteredAttendanceRecords(List<Map<String, dynamic>> attendanceRecords) {
+    // If no month is selected, return all records
+    if (_selectedMonth == null) {
+      return attendanceRecords;
+    }
+    
+    try {
+      return attendanceRecords.where((record) {
+        final dateStr = record['session_date'] as String?;
+        if (dateStr == null) return false;
+        
+        final recordDate = DateTime.parse(dateStr);
+        // Check if the record's month and year match the selected month
+        return recordDate.year == _selectedMonth!.year && 
+               recordDate.month == _selectedMonth!.month;
+      }).toList();
+    } catch (e) {
+      // Handle errors in record filtering
+      debugPrint('Error filtering attendance records: $e');
+      _showFilteringError('record filtering');
+      return attendanceRecords; // Return unfiltered records on error
+    }
+  }
+  
+  /// Calculates attendance statistics from filtered records
+  Map<String, dynamic> _calculateAttendanceStats(List<Map<String, dynamic>> records) {
+    if (records.isEmpty) {
+      return {
+        'percentage': 0.0,
+        'presentCount': 0,
+        'totalCount': 0,
+      };
+    }
+    
+    try {
+      final presentCount = records.where((record) => record['is_present'] == 1).length;
+      final totalCount = records.length;
+      final percentage = totalCount > 0 ? (presentCount / totalCount) * 100 : 0.0;
+      
+      return {
+        'percentage': percentage,
+        'presentCount': presentCount,
+        'totalCount': totalCount,
+      };
+    } catch (e) {
+      // Handle errors in statistics calculation
+      debugPrint('Error calculating attendance statistics: $e');
+      _showFilteringError('statistics calculation');
+      return {
+        'percentage': 0.0,
+        'presentCount': 0,
+        'totalCount': 0,
+      };
+    }
+  }
+  
+  /// Shows error message to user with recovery options
+  void _showFilteringError(String operation) {
+    if (mounted) {
+      CustomSnackBar.show(
+        context: context,
+        message: 'Error in $operation. Please try refreshing the data.',
+        type: SnackBarType.error,
+      );
+    }
   }
 
   @override
@@ -517,9 +629,51 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> with 
               onChanged: (value) {
                 setState(() {
                   _selectedStudentId = value;
+                  // Reset month filtering state when student selection changes
+                  _selectedMonth = null;
+                  _availableMonths = [];
                 });
               },
             ),
+            // Month selection dropdown - only show when student is selected and has available months
+            if (_selectedStudentId != null && _availableMonths.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Filter by Month',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<DateTime?>(
+                value: _selectedMonth,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                ),
+                hint: const Text('All Months'),
+                items: [
+                  // "All Months" option
+                  const DropdownMenuItem<DateTime?>(
+                    value: null,
+                    child: Text('All Months'),
+                  ),
+                  // Available months
+                  ..._availableMonths.map((month) {
+                    return DropdownMenuItem<DateTime?>(
+                      value: month,
+                      child: Text(DateFormat('MMMM yyyy').format(month)),
+                    );
+                  }).toList(),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedMonth = value;
+                  });
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -542,98 +696,35 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> with 
       );
     }
     
-    // Calculate attendance statistics
-    final attendancePercentage = student.attendancePercentage ?? 0.0;
-    
     return Column(
       children: [
-        Card(
-          margin: const EdgeInsets.symmetric(
-            horizontal: AppConstants.defaultPadding,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppConstants.defaultPadding),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      child: Text(
-                        student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            student.name,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          if (student.rollNumber != null && student.rollNumber!.isNotEmpty)
-                            Text(
-                              'Roll Number: ${student.rollNumber}',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                LinearProgressIndicator(
-                  value: attendancePercentage / 100,
-                  backgroundColor: Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    _getAttendanceColor(attendancePercentage),
-                  ),
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Attendance: ${attendancePercentage.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _getAttendanceColor(attendancePercentage),
-                      ),
-                    ),
-                    Text(
-                      _getAttendanceStatus(attendancePercentage),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _getAttendanceColor(attendancePercentage),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppConstants.defaultPadding,
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.history),
-              const SizedBox(width: 8),
+              Row(
+                children: [
+                  const Icon(Icons.history),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Attendance History',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               Text(
-                'Attendance History',
-                style: Theme.of(context).textTheme.titleMedium,
+                _selectedMonth != null 
+                    ? 'Showing records for ${DateFormat('MMMM yyyy').format(_selectedMonth!)}'
+                    : 'Showing all records',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ],
           ),
@@ -655,18 +746,161 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> with 
                 );
               }
               
-              final records = snapshot.data ?? [];
+              final allRecords = snapshot.data ?? [];
               
-              if (records.isEmpty) {
+              // Update available months when data is loaded
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                try {
+                  final availableMonths = _extractAvailableMonths(allRecords);
+                  if (_availableMonths.length != availableMonths.length ||
+                      !_availableMonths.every((month) => availableMonths.contains(month))) {
+                    setState(() {
+                      _availableMonths = availableMonths;
+                      // Reset month selection if it's no longer available
+                      if (_selectedMonth != null && !_availableMonths.contains(_selectedMonth)) {
+                        _selectedMonth = null;
+                      }
+                    });
+                  }
+                } catch (e) {
+                  debugPrint('Error updating available months: $e');
+                  _showFilteringError('month data update');
+                }
+              });
+              
+              // Apply month filtering
+              final filteredRecords = _getFilteredAttendanceRecords(allRecords);
+              
+              if (allRecords.isEmpty) {
                 return const Center(
                   child: Text('No attendance records found for this student'),
                 );
               }
               
-              return ListView.builder(
-                itemCount: records.length,
+              if (filteredRecords.isEmpty && _selectedMonth != null) {
+                return Center(
+                  child: Text(
+                    'No attendance records found for ${DateFormat('MMMM yyyy').format(_selectedMonth!)}',
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+              
+              // Calculate attendance statistics from filtered records
+              final stats = _calculateAttendanceStats(filteredRecords);
+              final attendancePercentage = stats['percentage'] as double;
+              
+              return Column(
+                children: [
+                  // Student statistics card
+                  Card(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: AppConstants.defaultPadding,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                child: Text(
+                                  student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 24,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      student.name,
+                                      style: Theme.of(context).textTheme.titleLarge,
+                                    ),
+                                    if (student.rollNumber != null && student.rollNumber!.isNotEmpty)
+                                      Text(
+                                        'Roll Number: ${student.rollNumber}',
+                                        style: Theme.of(context).textTheme.bodyMedium,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          LinearProgressIndicator(
+                            value: attendancePercentage / 100,
+                            backgroundColor: Colors.grey.shade300,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _getAttendanceColor(attendancePercentage),
+                            ),
+                            minHeight: 8,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Attendance: ${attendancePercentage.toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: _getAttendanceColor(attendancePercentage),
+                                ),
+                              ),
+                              Text(
+                                _getAttendanceStatus(attendancePercentage),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: _getAttendanceColor(attendancePercentage),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Text(
+                                'Present: ${stats['presentCount']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              Text(
+                                'Absent: ${stats['totalCount'] - stats['presentCount']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.red,
+                                ),
+                              ),
+                              Text(
+                                'Total: ${stats['totalCount']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Attendance records list
+                  Expanded(
+                    child: ListView.builder(
+                itemCount: filteredRecords.length,
                 itemBuilder: (context, index) {
-                  final record = records[index];
+                  final record = filteredRecords[index];
                   final date = DateTime.parse(record['session_date']);
                   final isPresent = record['is_present'] == 1;
                   
@@ -693,7 +927,10 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> with 
                       ),
                     ),
                   );
-                },
+                    },
+                  ),
+                ),
+                ],
               );
             },
           ),
