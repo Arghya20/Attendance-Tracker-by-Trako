@@ -85,37 +85,39 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    
-    return OrientationBuilder(
-      builder: (context, orientation) {
-        return MaterialApp(
-          title: AppConstants.appName,
-          theme: themeProvider.lightTheme,
-          darkTheme: themeProvider.darkTheme,
-          themeMode: themeProvider.themeMode,
-          debugShowCheckedModeBanner: false,
-          showPerformanceOverlay: PerformanceUtils.isDebugMode && false, // Set to true to enable performance overlay
-          home: const SplashScreen(),
-          builder: (context, child) {
-            // Apply a responsive font scale based on screen width
-            final mediaQuery = MediaQuery.of(context);
-            final width = mediaQuery.size.width;
-            
-            // Calculate a font scale factor based on screen width
-            // This ensures text is readable on all screen sizes
-            double fontScale = 1.0;
-            if (width < 360) {
-              fontScale = 0.8; // Small phones
-            } else if (width > 1200) {
-              fontScale = 1.2; // Large tablets/desktops
-            }
-            
-            return MediaQuery(
-              data: mediaQuery.copyWith(
-                textScaler: TextScaler.linear(fontScale),
-              ),
-              child: child!,
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return OrientationBuilder(
+          builder: (context, orientation) {
+            return MaterialApp(
+              title: AppConstants.appName,
+              theme: themeProvider.lightTheme,
+              darkTheme: themeProvider.darkTheme,
+              themeMode: themeProvider.themeMode,
+              debugShowCheckedModeBanner: false,
+              showPerformanceOverlay: PerformanceUtils.isDebugMode && false, // Set to true to enable performance overlay
+              home: const SplashScreen(),
+              builder: (context, child) {
+                // Apply a responsive font scale based on screen width
+                final mediaQuery = MediaQuery.of(context);
+                final width = mediaQuery.size.width;
+                
+                // Calculate a font scale factor based on screen width
+                // This ensures text is readable on all screen sizes
+                double fontScale = 1.0;
+                if (width < 360) {
+                  fontScale = 0.8; // Small phones
+                } else if (width > 1200) {
+                  fontScale = 1.2; // Large tablets/desktops
+                }
+                
+                return MediaQuery(
+                  data: mediaQuery.copyWith(
+                    textScaler: TextScaler.linear(fontScale),
+                  ),
+                  child: child!,
+                );
+              },
             );
           },
         );

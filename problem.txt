@@ -1,4 +1,1 @@
-1. the studant progress indigetor donot refresh automatecally after tecking attandance , after reopen the app its refresh.
-
-2. same with home screen add button color 
-
+1. on studant screen, tap and hold on any studant add popup for edit and delete.

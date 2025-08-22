@@ -88,32 +88,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         opacity: _fadeAnimation,
         child: _buildBody(classProvider),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(right: 8.0),
-        child: NeoPopTiltedButton(
-          color: Theme.of(context).colorScheme.primary,
-          onTapUp: () {
-            HapticFeedback.lightImpact();
-            _showAddClassDialog(context);
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.add, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  'Add Class',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+      floatingActionButton: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return RepaintBoundary(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: NeoPopTiltedButton(
+                color: Theme.of(context).colorScheme.primary,
+                onTapUp: () {
+                  HapticFeedback.lightImpact();
+                  _showAddClassDialog(context);
+                },
+                child: child!,
+              ),
             ),
-          ),
-        ),
+          );
+        },
+        child: _buildAddClassButtonContent(),
       ),
       // Bottom navigation bar removed as settings is available in the top app bar
     );
@@ -390,6 +381,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       onUnpin: classItem.isPinned ? () => _unpinClass(context, classItem) : null,
       onEdit: () => _showEditClassDialog(context, classItem),
       onDelete: () => _showDeleteConfirmation(context, classItem),
+    );
+  }
+
+  Widget _buildAddClassButtonContent() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.add, color: Colors.white),
+          const SizedBox(width: 8),
+          const Text(
+            'Add Class',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:attendance_tracker/constants/app_constants.dart';
 import 'package:attendance_tracker/models/models.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -8,6 +9,7 @@ class StudentListItem extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onLongPress;
   
   const StudentListItem({
     super.key,
@@ -15,6 +17,7 @@ class StudentListItem extends StatelessWidget {
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
+    this.onLongPress,
   });
 
   @override
@@ -59,6 +62,10 @@ class StudentListItem extends StatelessWidget {
           ),
           child: InkWell(
             onTap: onTap,
+            onLongPress: () {
+              HapticFeedback.mediumImpact();
+              onLongPress?.call();
+            },
             borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
             child: Padding(
               padding: const EdgeInsets.all(AppConstants.defaultPadding),

@@ -15,6 +15,9 @@ class StudentProvider extends ChangeNotifier {
   final Map<int, Student> _studentCache = {};
   final Map<int, DateTime> _lastLoadTimeByClass = {};
   
+  // Cache invalidation tracking
+  final Set<int> _invalidatedClasses = {};
+  
   // Getters
   List<Student> get students => _students;
   Student? get selectedStudent => _selectedStudent;
@@ -25,14 +28,19 @@ class StudentProvider extends ChangeNotifier {
   // Load students for a class
   Future<void> loadStudents(int classId) async {
     // Check if we have recently loaded students for this class (within the last 30 seconds)
+    // and the class hasn't been invalidated
     final now = DateTime.now();
     if (_lastLoadTimeByClass.containsKey(classId) && 
         now.difference(_lastLoadTimeByClass[classId]!).inSeconds < 30 && 
         _currentClassId == classId &&
-        _students.isNotEmpty) {
+        _students.isNotEmpty &&
+        !_invalidatedClasses.contains(classId)) {
       // Use cached data
       return;
     }
+    
+    // Remove from invalidated classes set if present
+    _invalidatedClasses.remove(classId);
     
     _setLoading(true);
     try {
@@ -48,6 +56,11 @@ class StudentProvider extends ChangeNotifier {
       
       _lastLoadTimeByClass[classId] = now;
       _error = null;
+      
+      // Periodically clean up cache to prevent memory leaks
+      if (_studentCache.length > 50) {
+        _cleanupCache();
+      }
     } catch (e) {
       _error = 'Failed to load students: $e';
       debugPrint(_error);
@@ -180,5 +193,62 @@ class StudentProvider extends ChangeNotifier {
   void clearCache() {
     _studentCache.clear();
     _lastLoadTimeByClass.clear();
+  }
+  
+  // Invalidate attendance cache for a specific class
+  void invalidateAttendanceCache(int classId) {
+    _invalidatedClasses.add(classId);
+    _lastLoadTimeByClass.remove(classId);
+    notifyListeners();
+  }
+  
+  // Force refresh attendance statistics for a class
+  Future<void> refreshAttendanceStats(int classId) async {
+    if (_currentClassId == classId) {
+      try {
+        // Add timeout for refresh operations (2 second limit)
+        await loadStudents(classId).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            _error = 'Refresh timeout - please try again';
+            debugPrint('Attendance stats refresh timed out for class $classId');
+            notifyListeners();
+          },
+        );
+      } catch (e) {
+        _error = 'Failed to refresh attendance data: $e';
+        debugPrint('Error refreshing attendance stats: $e');
+        notifyListeners();
+      }
+    }
+  }
+  
+  // Clean up old cache entries to prevent memory leaks
+  void _cleanupCache() {
+    final now = DateTime.now();
+    final keysToRemove = <int>[];
+    
+    // Remove cache entries older than 5 minutes
+    _lastLoadTimeByClass.forEach((classId, loadTime) {
+      if (now.difference(loadTime).inMinutes > 5) {
+        keysToRemove.add(classId);
+      }
+    });
+    
+    for (final key in keysToRemove) {
+      _lastLoadTimeByClass.remove(key);
+      _invalidatedClasses.remove(key);
+    }
+    
+    // Limit student cache size to prevent memory issues
+    if (_studentCache.length > 100) {
+      final entries = _studentCache.entries.toList();
+      entries.sort((a, b) => a.value.updatedAt.compareTo(b.value.updatedAt));
+      
+      // Remove oldest 20 entries
+      for (int i = 0; i < 20 && i < entries.length; i++) {
+        _studentCache.remove(entries[i].key);
+      }
+    }
   }
 }

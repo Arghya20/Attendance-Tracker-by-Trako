@@ -14,6 +14,7 @@ import 'package:attendance_tracker/widgets/custom_snackbar.dart';
 import 'package:attendance_tracker/widgets/action_button.dart';
 import 'package:attendance_tracker/widgets/student_details_dialog.dart';
 import 'package:attendance_tracker/widgets/animated_list_item.dart';
+import 'package:attendance_tracker/widgets/student_context_menu.dart';
 import 'package:attendance_tracker/screens/take_attendance_screen.dart';
 import 'package:attendance_tracker/screens/attendance_history_screen.dart';
 
@@ -247,6 +248,46 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
     }
   }
 
+  /// Handles attendance updates by refreshing student data
+  void _onAttendanceUpdated(int classId) {
+    final studentProvider = Provider.of<StudentProvider>(context, listen: false);
+    
+    // Only refresh if this is the current class to avoid unnecessary work
+    if (studentProvider.currentClassId == classId) {
+      studentProvider.invalidateAttendanceCache(classId);
+      studentProvider.refreshAttendanceStats(classId).then((_) {
+        // Check for errors after refresh
+        if (studentProvider.error != null && mounted) {
+          _handleRefreshError(studentProvider.error!);
+        }
+      });
+    }
+  }
+
+  /// Handles refresh errors with user-friendly messages and retry options
+  void _handleRefreshError(String error) {
+    CustomSnackBar.show(
+      context: context,
+      message: 'Failed to refresh attendance data: $error',
+      type: SnackBarType.error,
+      action: SnackBarAction(
+        label: 'Retry',
+        onPressed: () => _refreshStudentData(),
+        textColor: Colors.white,
+      ),
+    );
+  }
+
+  /// Manually refresh student data
+  void _refreshStudentData() {
+    final classProvider = Provider.of<ClassProvider>(context, listen: false);
+    if (classProvider.selectedClass != null) {
+      final studentProvider = Provider.of<StudentProvider>(context, listen: false);
+      studentProvider.invalidateAttendanceCache(classProvider.selectedClass!.id!);
+      studentProvider.refreshAttendanceStats(classProvider.selectedClass!.id!);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -265,6 +306,10 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
           listen: false,
         ).loadStudents(classProvider.selectedClass!.id!);
       }
+      
+      // Set up attendance update listener
+      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
+      attendanceProvider.onAttendanceUpdated = _onAttendanceUpdated;
     });
   }
 
@@ -459,6 +504,9 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
         itemCount: studentProvider.students.length + 1, // +1 for the header
         // Use cacheExtent to improve scrolling performance
         cacheExtent: 500,
+        // Optimize memory usage by not keeping alive off-screen items
+        addAutomaticKeepAlives: false,
+        addRepaintBoundaries: true,
         itemBuilder: (context, index) {
           if (index == 0) {
             // Header section - use RepaintBoundary to optimize rendering
@@ -515,6 +563,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
                         _showEditStudentDialog(context, classItem.id!, student),
                 onDelete:
                     () => _showDeleteStudentConfirmation(context, student),
+                onLongPress: () => _showStudentContextMenu(context, student),
               ),
             ),
           );
@@ -591,6 +640,18 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
       context: context,
       builder: (context) => StudentDetailsDialog(student: student),
     );
+  }
+
+  void _showStudentContextMenu(BuildContext context, Student student) {
+    final classProvider = Provider.of<ClassProvider>(context, listen: false);
+    if (classProvider.selectedClass != null) {
+      StudentContextMenu.show(
+        context: context,
+        student: student,
+        onEdit: () => _showEditStudentDialog(context, classProvider.selectedClass!.id!, student),
+        onDelete: () => _showDeleteStudentConfirmation(context, student),
+      );
+    }
   }
 
   void _showAddStudentDialog(BuildContext context, int classId) {
@@ -678,12 +739,17 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
     });
   }
 
-  void _takeAttendance(BuildContext context, Class classItem) {
-    NavigationService.navigateTo(
+  void _takeAttendance(BuildContext context, Class classItem) async {
+    final result = await NavigationService.navigateTo(
       context,
       TakeAttendanceScreen(classItem: classItem),
       transitionType: TransitionType.slide,
     );
+    
+    // Refresh data when returning from attendance screen
+    if (result == true) {
+      _onAttendanceUpdated(classItem.id!);
+    }
   }
 
   void _viewAttendanceHistory(BuildContext context, Class classItem) {

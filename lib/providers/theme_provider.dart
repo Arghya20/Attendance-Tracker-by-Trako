@@ -156,7 +156,7 @@ class ThemeProvider extends ChangeNotifier {
   
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
-    notifyListeners();
+    notifyThemeChanged();
     
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_themeModeKey, mode.index);
@@ -165,11 +165,27 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> setColorScheme(int index) async {
     if (index >= 0 && index < _lightColorSchemes.length) {
       _colorSchemeIndex = index;
-      notifyListeners();
+      notifyThemeChanged();
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_colorSchemeKey, index);
     }
+  }
+  
+  // Enhanced theme change notification with batching
+  bool _isNotifying = false;
+  
+  void notifyThemeChanged() {
+    if (_isNotifying) return; // Prevent rapid successive notifications
+    
+    _isNotifying = true;
+    notifyListeners();
+    
+    // Force a frame rebuild to ensure all widgets update
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+      _isNotifying = false;
+    });
   }
   
   bool get isDarkMode => 

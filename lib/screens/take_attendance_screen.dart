@@ -173,7 +173,7 @@ class _TakeAttendanceScreenState extends State<TakeAttendanceScreen> {
             message: 'Attendance saved successfully',
             type: SnackBarType.success,
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         } else {
           setState(() {
             _errorMessage = attendanceProvider.error ?? 'Failed to save attendance';

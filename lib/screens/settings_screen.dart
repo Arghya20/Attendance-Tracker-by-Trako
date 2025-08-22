@@ -143,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           selected: {themeProvider.themeMode},
           onSelectionChanged: (Set<ThemeMode> selection) {
             if (selection.isNotEmpty) {
-              themeProvider.setThemeMode(selection.first);
+              _changeThemeMode(selection.first, themeProvider);
             }
           },
         ),
@@ -184,7 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isSelected = themeProvider.colorSchemeIndex == index;
     
     return InkWell(
-      onTap: () => themeProvider.setColorScheme(index),
+      onTap: () => _changeColorScheme(index, themeProvider),
       borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
       child: Container(
         padding: const EdgeInsets.symmetric(
@@ -226,5 +226,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _changeColorScheme(int index, ThemeProvider themeProvider) async {
+    try {
+      await themeProvider.setColorScheme(index);
+      
+      // Ensure the current screen rebuilds
+      if (mounted) {
+        setState(() {});
+        
+        // Show visual feedback
+        CustomSnackBar.show(
+          context: context,
+          message: 'Color scheme changed to ${ThemeProvider.colorSchemeNames[index]}',
+          type: SnackBarType.success,
+          duration: const Duration(seconds: 1),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomSnackBar.show(
+          context: context,
+          message: 'Failed to change color scheme',
+          type: SnackBarType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _changeThemeMode(ThemeMode mode, ThemeProvider themeProvider) async {
+    try {
+      await themeProvider.setThemeMode(mode);
+      
+      // Ensure the current screen rebuilds
+      if (mounted) {
+        setState(() {});
+        
+        // Show visual feedback
+        String modeName = mode.name;
+        modeName = modeName[0].toUpperCase() + modeName.substring(1);
+        
+        CustomSnackBar.show(
+          context: context,
+          message: 'Theme mode changed to $modeName',
+          type: SnackBarType.success,
+          duration: const Duration(seconds: 1),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomSnackBar.show(
+          context: context,
+          message: 'Failed to change theme mode',
+          type: SnackBarType.error,
+        );
+      }
+    }
   }
 }

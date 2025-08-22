@@ -12,6 +12,9 @@ class AttendanceProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   
+  // Callback for attendance updates
+  void Function(int classId)? onAttendanceUpdated;
+  
   // Getters
   List<AttendanceSession> get sessions => _sessions;
   AttendanceSession? get selectedSession => _selectedSession;
@@ -113,6 +116,10 @@ class AttendanceProvider extends ChangeNotifier {
         _records = records;
         await loadAttendanceRecords(sessionId);
         _error = null;
+        
+        // Notify about attendance update
+        notifyAttendanceUpdated(session.classId);
+        
         return true;
       }
       _error = 'Failed to save attendance records';
@@ -212,5 +219,12 @@ class AttendanceProvider extends ChangeNotifier {
     _records = [];
     _attendanceWithStudentInfo = [];
     notifyListeners();
+  }
+  
+  // Notify about attendance updates
+  void notifyAttendanceUpdated(int classId) {
+    if (onAttendanceUpdated != null) {
+      onAttendanceUpdated!(classId);
+    }
   }
 }
