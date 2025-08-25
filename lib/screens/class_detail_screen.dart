@@ -362,12 +362,20 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [Tab(text: 'Students'), Tab(text: 'Analytics')],
-          labelColor: Colors.white, // Use white color for active tab text
-          unselectedLabelColor:
-              Colors
-                  .white70, // Use slightly transparent white for inactive tabs
-          indicatorColor: Colors.white, // Use white for the indicator line
-          indicatorWeight: 3.0, // Make the indicator line slightly thicker
+          labelColor: theme.brightness == Brightness.light 
+              ? theme.colorScheme.onPrimary 
+              : theme.colorScheme.onSurface,
+          unselectedLabelColor: theme.brightness == Brightness.light 
+              ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
+              : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          indicator: UnderlineTabIndicator(
+            borderSide: BorderSide(
+              width: 3.0,
+              color: theme.brightness == Brightness.light 
+                  ? Colors.white 
+                  : theme.colorScheme.primary,
+            ),
+          ),
         ),
       ),
       body: TabBarView(

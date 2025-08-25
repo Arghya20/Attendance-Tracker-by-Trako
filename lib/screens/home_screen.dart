@@ -72,11 +72,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         elevation: 2,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => classProvider.loadClasses(),
-            tooltip: 'Refresh Classes',
-          ),
-          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => _navigateToSettings(context),
             tooltip: 'Settings',

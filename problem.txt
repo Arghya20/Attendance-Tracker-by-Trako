@@ -1,1 +1,8 @@
-1. on studant screen, tap and hold on any studant add popup for edit and delete.
+
+2. Add Export Data - pdf download monthly wise features.
+3. Add firebase Push notificaton.
+4. add Google anletics.
+5. Add googel Ads.
+
+6. Add user name and profile 
+7. backup and recover data option 
