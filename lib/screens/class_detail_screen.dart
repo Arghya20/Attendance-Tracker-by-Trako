@@ -630,8 +630,8 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
                       color: Colors.blue,
                     ),
                     ActionButton(
-                      label: 'Export Data',
-                      icon: Icons.download,
+                      label: 'Monthly Reports',
+                      icon: Icons.assessment,
                       onPressed: () => _exportData(context, classItem),
                       color: Colors.purple,
                     ),

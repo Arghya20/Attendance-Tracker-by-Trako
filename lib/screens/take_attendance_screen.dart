@@ -625,16 +625,16 @@ class _TakeAttendanceScreenState extends State<TakeAttendanceScreen> {
               child: SizedBox(
                 height: 48,
                 child: NeoPopButton(
-                  color: Colors.grey,
+                  color: Colors.white10,
                   onTapUp: () {
                     HapticFeedback.lightImpact();
                     Navigator.pop(context);
                   },
-                  child: const Center(
+                  child: Center(
                     child: Text(
                       'Cancel',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                       ),

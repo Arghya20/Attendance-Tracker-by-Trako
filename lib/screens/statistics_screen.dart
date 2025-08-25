@@ -371,8 +371,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             tooltip: 'Refresh',
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.download),
-            tooltip: 'Export Data',
+            icon: const Icon(Icons.assessment),
+            tooltip: 'Monthly Reports',
             onSelected: (value) {
               if (value == 'monthly') {
                 _exportData();
