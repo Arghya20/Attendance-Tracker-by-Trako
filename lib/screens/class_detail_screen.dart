@@ -17,6 +17,8 @@ import 'package:attendance_tracker/widgets/animated_list_item.dart';
 import 'package:attendance_tracker/widgets/student_context_menu.dart';
 import 'package:attendance_tracker/screens/take_attendance_screen.dart';
 import 'package:attendance_tracker/screens/attendance_history_screen.dart';
+import 'package:attendance_tracker/screens/month_export_screen.dart';
+import 'package:attendance_tracker/widgets/month_selection_dialog.dart';
 
 import 'package:attendance_tracker/services/navigation_service.dart';
 import 'package:attendance_tracker/utils/page_transitions.dart';
@@ -768,11 +770,42 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
     );
   }
 
-  void _exportData(BuildContext context, Class classItem) {
-    CustomSnackBar.show(
+  void _exportData(BuildContext context, Class classItem) async {
+    final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
+    
+    // Load available months
+    await attendanceProvider.loadAvailableMonths(classItem.id!);
+    
+    if (!context.mounted) return;
+    
+    // Show month selection dialog
+    final selectedMonth = await showMonthSelectionDialog(
       context: context,
-      message: 'Export functionality will be available in a future update',
-      type: SnackBarType.info,
+      availableMonths: attendanceProvider.availableMonths,
+      isLoading: attendanceProvider.isLoading,
+      errorMessage: attendanceProvider.error,
+      onRetry: () => attendanceProvider.loadAvailableMonths(classItem.id!),
     );
+    
+    if (selectedMonth != null && context.mounted) {
+      // Load month data and navigate to export screen
+      await attendanceProvider.loadMonthAttendanceData(classItem.id!, selectedMonth);
+      
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MonthExportScreen(
+              classItem: classItem,
+              selectedMonth: selectedMonth,
+              monthData: attendanceProvider.monthAttendanceData,
+              isLoading: attendanceProvider.isLoading,
+              errorMessage: attendanceProvider.error,
+              onRetry: () => attendanceProvider.loadMonthAttendanceData(classItem.id!, selectedMonth),
+            ),
+          ),
+        );
+      }
+    }
   }
 }

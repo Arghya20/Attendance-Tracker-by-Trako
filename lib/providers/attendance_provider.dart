@@ -227,4 +227,51 @@ class AttendanceProvider extends ChangeNotifier {
       onAttendanceUpdated!(classId);
     }
   }
+  
+  // Month export functionality
+  List<DateTime> _availableMonths = [];
+  MonthAttendanceData? _monthAttendanceData;
+  
+  // Getters for month export
+  List<DateTime> get availableMonths => _availableMonths;
+  MonthAttendanceData? get monthAttendanceData => _monthAttendanceData;
+  
+  // Get all months that have attendance data for a class
+  Future<void> loadAvailableMonths(int classId) async {
+    _setLoading(true);
+    try {
+      _availableMonths = await _repository.getAvailableMonthsForClass(classId);
+      _error = null;
+    } catch (e) {
+      _error = 'Failed to load available months: $e';
+      debugPrint(_error);
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // Get detailed month attendance data
+  Future<void> loadMonthAttendanceData(int classId, DateTime month) async {
+    _setLoading(true);
+    try {
+      _monthAttendanceData = await _repository.getMonthAttendanceData(
+        classId, 
+        month.year, 
+        month.month,
+      );
+      _error = null;
+    } catch (e) {
+      _error = 'Failed to load month attendance data: $e';
+      debugPrint(_error);
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // Clear month data
+  void clearMonthData() {
+    _availableMonths = [];
+    _monthAttendanceData = null;
+    notifyListeners();
+  }
 }

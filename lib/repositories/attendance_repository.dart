@@ -161,4 +161,123 @@ class AttendanceRepository {
       return [];
     }
   }
+  
+  // Get distinct months with attendance sessions for a class
+  Future<List<DateTime>> getAvailableMonthsForClass(int classId) async {
+    try {
+      final db = await _databaseService.database;
+      final result = await db.rawQuery('''
+        SELECT DISTINCT strftime('%Y-%m', date) as month_year 
+        FROM ${AppConstants.attendanceSessionTable} 
+        WHERE class_id = ? 
+        ORDER BY month_year DESC
+      ''', [classId]);
+      
+      return result.map((row) {
+        final monthYear = row['month_year'] as String;
+        final parts = monthYear.split('-');
+        final year = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        return DateTime(year, month);
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getting available months for class: $e');
+      return [];
+    }
+  }
+  
+  // Get all attendance data for a specific month and class
+  Future<MonthAttendanceData> getMonthAttendanceData(int classId, int year, int month) async {
+    try {
+      final monthDateTime = DateTime(year, month);
+      final monthStr = '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
+      
+      // Get students for the class
+      final studentsData = await _databaseHelper.getStudentsByClassId(classId);
+      final students = studentsData.map((data) => Student.fromMap(data)).toList();
+      
+      if (students.isEmpty) {
+        return MonthAttendanceData.empty(monthDateTime);
+      }
+      
+      // Get attendance sessions for the month
+      final db = await _databaseService.database;
+      final sessionsResult = await db.rawQuery('''
+        SELECT * FROM ${AppConstants.attendanceSessionTable}
+        WHERE class_id = ? AND strftime('%Y-%m', date) = ?
+        ORDER BY date ASC
+      ''', [classId, monthStr]);
+      
+      final attendanceDays = sessionsResult
+          .map((session) => DateTime.parse(session['date'] as String))
+          .toList();
+      
+      if (attendanceDays.isEmpty) {
+        return MonthAttendanceData(
+          month: monthDateTime,
+          students: students,
+          attendanceDays: [],
+          attendanceMatrix: {},
+          attendancePercentages: {},
+        );
+      }
+      
+      // Get attendance records for all sessions in the month
+      final sessionIds = sessionsResult.map((s) => s['id'] as int).toList();
+      final sessionIdsStr = sessionIds.join(',');
+      
+      final attendanceResult = await db.rawQuery('''
+        SELECT 
+          ar.student_id,
+          ar.is_present,
+          ats.date
+        FROM ${AppConstants.attendanceRecordTable} ar
+        JOIN ${AppConstants.attendanceSessionTable} ats ON ar.session_id = ats.id
+        WHERE ar.session_id IN ($sessionIdsStr)
+        ORDER BY ar.student_id, ats.date
+      ''');
+      
+      // Build attendance matrix
+      final Map<int, Map<DateTime, bool>> attendanceMatrix = {};
+      final Map<int, double> attendancePercentages = {};
+      
+      // Initialize matrix for all students
+      for (final student in students) {
+        attendanceMatrix[student.id!] = {};
+      }
+      
+      // Fill attendance data
+      for (final record in attendanceResult) {
+        final studentId = record['student_id'] as int;
+        final isPresent = (record['is_present'] as int) == 1;
+        final date = DateTime.parse(record['date'] as String);
+        
+        attendanceMatrix[studentId]![date] = isPresent;
+      }
+      
+      // Calculate attendance percentages
+      for (final student in students) {
+        final studentAttendance = attendanceMatrix[student.id!]!;
+        final presentCount = studentAttendance.values.where((present) => present == true).length;
+        final totalDays = studentAttendance.length;
+        
+        final percentage = totalDays > 0 
+            ? MonthAttendanceData.calculateAttendancePercentage(presentCount, totalDays)
+            : 0.0;
+        
+        attendancePercentages[student.id!] = percentage;
+      }
+      
+      return MonthAttendanceData(
+        month: monthDateTime,
+        students: students,
+        attendanceDays: attendanceDays,
+        attendanceMatrix: attendanceMatrix,
+        attendancePercentages: attendancePercentages,
+      );
+    } catch (e) {
+      debugPrint('Error getting month attendance data: $e');
+      return MonthAttendanceData.empty(DateTime(year, month));
+    }
+  }
 }

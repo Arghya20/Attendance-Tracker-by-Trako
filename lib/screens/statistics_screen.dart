@@ -6,12 +6,17 @@ import 'package:attendance_tracker/models/models.dart';
 import 'package:attendance_tracker/widgets/loading_indicator.dart';
 import 'package:attendance_tracker/widgets/error_message.dart';
 import 'package:attendance_tracker/widgets/custom_snackbar.dart';
+import 'package:attendance_tracker/widgets/month_selection_dialog.dart';
+import 'package:attendance_tracker/screens/month_export_screen.dart';
 import 'package:attendance_tracker/utils/responsive_layout.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:csv/csv.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class StatisticsScreen extends StatefulWidget {
   final Class classItem;
@@ -91,20 +96,75 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
   
   Future<void> _exportData() async {
+    final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
+    
+    // Load available months
+    await attendanceProvider.loadAvailableMonths(widget.classItem.id!);
+    
+    if (!mounted) return;
+    
+    // Show month selection dialog
+    final selectedMonth = await showMonthSelectionDialog(
+      context: context,
+      availableMonths: attendanceProvider.availableMonths,
+      isLoading: attendanceProvider.isLoading,
+      errorMessage: attendanceProvider.error,
+      onRetry: () => attendanceProvider.loadAvailableMonths(widget.classItem.id!),
+    );
+    
+    if (selectedMonth != null && mounted) {
+      // Load month data and navigate to export screen
+      await attendanceProvider.loadMonthAttendanceData(widget.classItem.id!, selectedMonth);
+      
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MonthExportScreen(
+              classItem: widget.classItem,
+              selectedMonth: selectedMonth,
+              monthData: attendanceProvider.monthAttendanceData,
+              isLoading: attendanceProvider.isLoading,
+              errorMessage: attendanceProvider.error,
+              onRetry: () => attendanceProvider.loadMonthAttendanceData(widget.classItem.id!, selectedMonth),
+            ),
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _exportSummaryData() async {
     setState(() {
       _isLoading = true;
     });
     
     try {
-      // Create CSV data
-      final List<List<dynamic>> csvData = [];
+      final fileName = 'attendance_summary_${widget.classItem.name}_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
       
-      // Add header row
-      final headerRow = ['Student Name', 'Roll Number', 'Present', 'Absent', 'Percentage'];
-      csvData.add(headerRow);
+      // Create PDF document
+      final pdf = pw.Document();
       
-      // Add data rows
+      // Calculate overall statistics
+      int totalPresent = 0;
+      int totalAbsent = 0;
+      
       for (final student in _students) {
+        final attendance = _studentAttendance[student.id!] ?? [];
+        totalPresent += attendance.where((a) => a['is_present'] == 1).length;
+        totalAbsent += attendance.where((a) => a['is_present'] == 0).length;
+      }
+      
+      final totalAttendance = totalPresent + totalAbsent;
+      final overallPercentage = totalAttendance > 0
+          ? (totalPresent / totalAttendance) * 100
+          : 0.0;
+      
+      // Create table data
+      final tableData = <List<String>>[];
+      
+      for (int i = 0; i < _students.length; i++) {
+        final student = _students[i];
         final attendance = _studentAttendance[student.id!] ?? [];
         final presentCount = attendance.where((a) => a['is_present'] == 1).length;
         final absentCount = attendance.length - presentCount;
@@ -112,30 +172,163 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             ? 0.0
             : (presentCount / attendance.length) * 100;
         
-        final row = [
+        tableData.add([
+          '${i + 1}',
           student.name,
-          student.rollNumber ?? '',
-          presentCount,
-          absentCount,
-          percentage.toStringAsFixed(2) + '%',
-        ];
-        
-        csvData.add(row);
+          student.rollNumber ?? '-',
+          presentCount.toString(),
+          absentCount.toString(),
+          '${percentage.toStringAsFixed(1)}%',
+        ]);
       }
       
-      // Convert to CSV string
-      final csv = const ListToCsvConverter().convert(csvData);
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(20),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Header
+                pw.Text(
+                  'Attendance Summary Report',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Text(
+                  'Class: ${widget.classItem.name}',
+                  style: pw.TextStyle(fontSize: 16),
+                ),
+                pw.Text(
+                  'Generated on: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.now())}',
+                  style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
+                ),
+                pw.SizedBox(height: 20),
+                
+                // Summary
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey300),
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                    children: [
+                      pw.Column(
+                        children: [
+                          pw.Text('Total Students', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                          pw.Text('${_students.length}'),
+                        ],
+                      ),
+                      pw.Column(
+                        children: [
+                          pw.Text('Total Sessions', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                          pw.Text('${_sessions.length}'),
+                        ],
+                      ),
+                      pw.Column(
+                        children: [
+                          pw.Text('Overall Attendance', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                          pw.Text('${overallPercentage.toStringAsFixed(1)}%'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                pw.SizedBox(height: 20),
+                
+                // Student Summary Table
+                pw.Table(
+                  border: pw.TableBorder.all(color: PdfColors.grey400),
+                  columnWidths: {
+                    0: const pw.FixedColumnWidth(30), // SL
+                    1: const pw.FlexColumnWidth(3), // Name
+                    2: const pw.FlexColumnWidth(2), // Roll Number
+                    3: const pw.FixedColumnWidth(50), // Present
+                    4: const pw.FixedColumnWidth(50), // Absent
+                    5: const pw.FixedColumnWidth(70), // Percentage
+                  },
+                  children: [
+                    // Header row
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                      children: [
+                        'SL',
+                        'Student Name',
+                        'Roll Number',
+                        'Present',
+                        'Absent',
+                        'Percentage',
+                      ].map((header) => 
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text(
+                            header,
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                            textAlign: pw.TextAlign.center,
+                          ),
+                        ),
+                      ).toList(),
+                    ),
+                    
+                    // Data rows
+                    ...tableData.map((row) => 
+                      pw.TableRow(
+                        children: row.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final cell = entry.value;
+                          
+                          return pw.Container(
+                            padding: const pw.EdgeInsets.all(8),
+                            child: pw.Text(
+                              cell,
+                              style: pw.TextStyle(
+                                fontSize: 11,
+                                fontWeight: index == 1 ? pw.FontWeight.bold : pw.FontWeight.normal,
+                              ),
+                              textAlign: index == 0 || index > 2 
+                                  ? pw.TextAlign.center 
+                                  : pw.TextAlign.left,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ).toList(),
+                  ],
+                ),
+                
+                pw.SizedBox(height: 20),
+                
+                // Footer
+                pw.Text(
+                  'This report shows the overall attendance summary for all students in the class.',
+                  style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+                ),
+              ],
+            );
+          },
+        ),
+      );
       
-      // Save to temporary file
+      // Save PDF to temporary file
       final directory = await getTemporaryDirectory();
-      final fileName = 'attendance_${widget.classItem.name}_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
       final file = File('${directory.path}/$fileName');
-      await file.writeAsString(csv);
+      await file.writeAsBytes(await pdf.save());
       
-      // Share the file
+      // Share the PDF file
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'Attendance Report - ${widget.classItem.name}',
+        subject: 'Attendance Summary - ${widget.classItem.name}',
+        text: 'Attendance summary report for ${widget.classItem.name}',
       );
       
       if (mounted) {
@@ -145,7 +338,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         
         CustomSnackBar.show(
           context: context,
-          message: 'Attendance data exported successfully',
+          message: 'Attendance summary saved successfully',
           type: SnackBarType.success,
         );
       }
@@ -157,7 +350,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         
         CustomSnackBar.show(
           context: context,
-          message: 'Failed to export data: $e',
+          message: 'Failed to save summary: $e',
           type: SnackBarType.error,
         );
       }
@@ -177,10 +370,38 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             onPressed: _loadData,
             tooltip: 'Refresh',
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.download),
-            onPressed: _exportData,
             tooltip: 'Export Data',
+            onSelected: (value) {
+              if (value == 'monthly') {
+                _exportData();
+              } else if (value == 'summary') {
+                _exportSummaryData();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'monthly',
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_month),
+                    SizedBox(width: 8),
+                    Text('Monthly Report'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'summary',
+                child: Row(
+                  children: [
+                    Icon(Icons.summarize),
+                    SizedBox(width: 8),
+                    Text('Summary Report'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

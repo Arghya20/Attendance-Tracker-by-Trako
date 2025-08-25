@@ -55,6 +55,8 @@ dependencies:
   package_info_plus: ^5.0.1
   neopop: ^1.0.2
   google_fonts: ^6.1.0
+  pdf: ^3.10.7
+  printing: ^5.12.0
 
 dev_dependencies:
   flutter_test:
