@@ -1,8 +1,9 @@
 
-2. Add Export Data - pdf download monthly wise features.
-3. Add firebase Push notificaton.
-4. add Google anletics.
-5. Add googel Ads.
+1. Add login opton 
+2. Add user name and profile 
+3. backup and recover data option 
 
-6. Add user name and profile 
-7. backup and recover data option 
+
+4. Add firebase Push notificaton.
+5. add Google anletics.
+6. Add googel Ads. 

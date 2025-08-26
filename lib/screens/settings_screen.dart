@@ -3,6 +3,7 @@ import 'package:attendance_tracker/constants/app_constants.dart';
 import 'package:provider/provider.dart';
 import 'package:attendance_tracker/providers/providers.dart';
 import 'package:attendance_tracker/widgets/custom_snackbar.dart';
+import 'package:attendance_tracker/widgets/backup_restore_dialog.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -63,6 +64,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildThemeModeSelector(themeProvider),
               const SizedBox(height: 16),
               _buildColorSchemeSelector(themeProvider),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildSection(
+            title: 'Data Management',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.backup),
+                title: const Text('Backup & Restore'),
+                subtitle: const Text('Export or import your attendance data'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: _showBackupRestoreDialog,
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -282,6 +296,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           type: SnackBarType.error,
         );
       }
+    }
+  }
+
+  Future<void> _showBackupRestoreDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => const BackupRestoreDialog(),
+    );
+    
+    // If data was restored, show a message and potentially refresh the app
+    if (result == true && mounted) {
+      CustomSnackBar.show(
+        context: context,
+        message: 'Data restored successfully. Please restart the app to see changes.',
+        type: SnackBarType.info,
+        duration: const Duration(seconds: 4),
+      );
     }
   }
 }

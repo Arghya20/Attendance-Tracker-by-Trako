@@ -9,6 +9,7 @@ A Flutter application for tracking student attendance in classes.
 - **Attendance Recording**: Take attendance for a class on a specific date
 - **Attendance History**: View past attendance records by date or student
 - **Statistics**: View attendance statistics and export data
+- **Backup & Restore**: Export all data to backup files and restore from backups
 - **Themes**: Light and dark mode support with multiple color schemes
 - **Responsive Design**: Works on phones and tablets in any orientation
 
@@ -76,6 +77,8 @@ The app follows a layered architecture pattern:
 - **shared_preferences**: Local storage
 - **csv**: CSV file generation
 - **share_plus**: Sharing functionality
+- **file_picker**: File selection for backup restore
+- **permission_handler**: Storage permissions for backup/restore
 
 ## Testing
 
