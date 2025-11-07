@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:attendance_tracker/firebase_options.dart';
 import 'package:attendance_tracker/constants/app_constants.dart';
-import 'package:attendance_tracker/screens/splash_screen.dart';
+import 'package:attendance_tracker/screens/auth/auth_wrapper.dart';
 import 'package:attendance_tracker/services/service_locator.dart';
 import 'package:attendance_tracker/utils/performance_utils.dart';
 import 'package:attendance_tracker/utils/app_error_handler.dart';
@@ -16,6 +18,11 @@ void main() async {
   AppErrorHandler.initialize();
   
   try {
+    // Initialize Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    
     // Initialize service locator
     final stopwatch = Stopwatch()..start();
     final serviceLocator = ServiceLocator();
@@ -96,7 +103,7 @@ class MyApp extends StatelessWidget {
               themeMode: themeProvider.themeMode,
               debugShowCheckedModeBanner: false,
               showPerformanceOverlay: PerformanceUtils.isDebugMode && false, // Set to true to enable performance overlay
-              home: const SplashScreen(),
+              home: const AuthWrapper(),
               builder: (context, child) {
                 // Apply a responsive font scale based on screen width
                 final mediaQuery = MediaQuery.of(context);

@@ -1,4 +1,5 @@
 import 'package:attendance_tracker/providers/providers.dart';
+import 'package:attendance_tracker/providers/auth_provider.dart';
 import 'package:attendance_tracker/repositories/repositories.dart';
 import 'package:attendance_tracker/services/database_service.dart';
 import 'package:attendance_tracker/services/database_helper.dart';
@@ -28,6 +29,7 @@ class ServiceLocator {
   
   // Providers
   late ThemeProvider _themeProvider;
+  late AuthProvider _authProvider;
   late ClassProvider _classProvider;
   late StudentProvider _studentProvider;
   late AttendanceProvider _attendanceProvider;
@@ -46,6 +48,7 @@ class ServiceLocator {
     
     // Initialize providers
     _themeProvider = ThemeProvider();
+    _authProvider = AuthProvider();
     _classProvider = ClassProvider();
     _studentProvider = StudentProvider();
     _attendanceProvider = AttendanceProvider();
@@ -55,6 +58,7 @@ class ServiceLocator {
   List<SingleChildWidget> getProviders() {
     return [
       ChangeNotifierProvider<ThemeProvider>.value(value: _themeProvider),
+      ChangeNotifierProvider<AuthProvider>.value(value: _authProvider),
       ChangeNotifierProvider<ClassProvider>.value(value: _classProvider),
       ChangeNotifierProvider<StudentProvider>.value(value: _studentProvider),
       ChangeNotifierProvider<AttendanceProvider>.value(value: _attendanceProvider),
@@ -63,6 +67,7 @@ class ServiceLocator {
   
   /// Reset all providers
   void resetProviders() {
+    _authProvider = AuthProvider();
     _classProvider = ClassProvider();
     _studentProvider = StudentProvider();
     _attendanceProvider = AttendanceProvider();
@@ -80,6 +85,7 @@ class ServiceLocator {
   StudentRepository get studentRepository => _studentRepository;
   AttendanceRepository get attendanceRepository => _attendanceRepository;
   ThemeProvider get themeProvider => _themeProvider;
+  AuthProvider get authProvider => _authProvider;
   ClassProvider get classProvider => _classProvider;
   StudentProvider get studentProvider => _studentProvider;
   AttendanceProvider get attendanceProvider => _attendanceProvider;

@@ -14,6 +14,7 @@ import 'package:attendance_tracker/widgets/custom_snackbar.dart';
 import 'package:attendance_tracker/widgets/animated_list_item.dart';
 import 'package:attendance_tracker/widgets/pin_context_menu.dart';
 import 'package:attendance_tracker/screens/settings_screen.dart';
+import 'package:attendance_tracker/providers/auth_provider.dart';
 import 'package:attendance_tracker/services/navigation_service.dart';
 import 'package:attendance_tracker/utils/page_transitions.dart';
 import 'package:neopop/neopop.dart';
@@ -71,10 +72,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         title: const Text(AppConstants.appName),
         elevation: 2,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => _navigateToSettings(context),
-            tooltip: 'Settings',
+          Consumer<AuthProvider>(
+            builder: (context, authProvider, child) {
+              final user = authProvider.currentUser;
+              return GestureDetector(
+                onTap: () => _navigateToSettings(context),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundImage: user?.photoURL != null
+                        ? NetworkImage(user!.photoURL!)
+                        : null,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    child: user?.photoURL == null
+                        ? Text(
+                            _getUserInitials(user),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -311,6 +335,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       const SettingsScreen(),
       transitionType: TransitionType.fade,
     );
+  }
+
+  String _getUserInitials(user) {
+    if (user?.displayName != null && user!.displayName!.isNotEmpty) {
+      final names = user.displayName!.split(' ');
+      if (names.length >= 2) {
+        return '${names[0][0]}${names[1][0]}'.toUpperCase();
+      } else {
+        return names[0][0].toUpperCase();
+      }
+    } else if (user?.email != null && user!.email!.isNotEmpty) {
+      return user.email![0].toUpperCase();
+    } else if (user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty) {
+      return 'U';
+    }
+    return 'U';
   }
 
   // Pin operations

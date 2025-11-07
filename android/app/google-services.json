@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "377349051863",
+    "project_id": "ttendance-tracker-app",
+    "storage_bucket": "ttendance-tracker-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:377349051863:android:e10543e989ceb1a9916792",
+        "android_client_info": {
+          "package_name": "com.example.attendance_tracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "377349051863-lb6su34a9ghamografepnflv86dd3cbb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.attendance_tracker",
+            "certificate_hash": "e2a29d033e7709c3be5a7473dd2b71cbb6a3cdf1"
+          }
+        },
+        {
+          "client_id": "377349051863-8mrpv3ac3c6fd4j6rnfp95bm9j1ed427.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChQQmktqsiSNPibSq9h-l0Y-VwsnrtNdM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "377349051863-8mrpv3ac3c6fd4j6rnfp95bm9j1ed427.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "377349051863-n9mdrq564d8cakue81haiovfohl488k9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.attendanceTracker"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
