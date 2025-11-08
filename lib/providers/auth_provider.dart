@@ -5,6 +5,9 @@ import 'package:attendance_tracker/services/auth_service.dart';
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   
+  // Expose auth service for callback setup
+  AuthService get authService => _authService;
+  
   AuthStatus get status => _authService.status;
   UserModel? get currentUser => _authService.currentUser;
   bool get isAuthenticated => _authService.isAuthenticated;
@@ -83,6 +86,11 @@ class AuthProvider extends ChangeNotifier {
     await _authService.confirmLinkPhoneNumber(otp);
   }
   
+  // Link Google Account
+  Future<void> linkGoogleAccount() async {
+    await _authService.linkGoogleAccount();
+  }
+  
   // Unlink providers
   Future<void> unlinkPhoneNumber() async {
     await _authService.unlinkPhoneNumber();
@@ -107,6 +115,11 @@ class AuthProvider extends ChangeNotifier {
   
   Future<void> confirmReauthenticateWithPhone(String otp) async {
     await _authService.confirmReauthenticateWithPhone(otp);
+  }
+  
+  // Update display name
+  Future<void> updateDisplayName(String displayName) async {
+    await _authService.updateDisplayName(displayName);
   }
   
   // Provider info

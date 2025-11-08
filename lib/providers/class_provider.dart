@@ -241,4 +241,18 @@ class ClassProvider extends ChangeNotifier {
     _classCache.clear();
     _lastLoadTime = null;
   }
+  
+  /// Reset provider state (used when switching accounts)
+  Future<void> reset() async {
+    _classes = [];
+    _selectedClass = null;
+    _isLoading = false;
+    _error = null;
+    _classCache.clear();
+    _lastLoadTime = null;
+    notifyListeners();
+    
+    // Reload data from database after reset
+    await loadClasses();
+  }
 }

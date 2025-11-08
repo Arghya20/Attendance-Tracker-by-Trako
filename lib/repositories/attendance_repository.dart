@@ -2,11 +2,13 @@ import 'package:attendance_tracker/constants/app_constants.dart';
 import 'package:attendance_tracker/models/models.dart';
 import 'package:attendance_tracker/services/database_helper.dart';
 import 'package:attendance_tracker/services/database_service.dart';
+import 'package:attendance_tracker/services/cloud_sync_service.dart';
 import 'package:flutter/foundation.dart';
 
 class AttendanceRepository {
   final DatabaseService _databaseService = DatabaseService();
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final CloudSyncService _cloudSyncService = CloudSyncService();
   
   // Create or get attendance session
   Future<AttendanceSession?> createOrGetSession(int classId, DateTime date) async {
@@ -105,6 +107,10 @@ class AttendanceRepository {
       }).toList();
       
       await _databaseHelper.saveAttendanceRecords(sessionId, recordsData);
+      
+      // Trigger sync after data change
+      _cloudSyncService.syncAfterDataChange();
+      
       return true;
     } catch (e) {
       debugPrint('Error saving attendance records: $e');
@@ -144,6 +150,11 @@ class AttendanceRepository {
         },
         record.id!,
       );
+      
+      // Trigger sync after data change
+      if (result > 0) {
+        _cloudSyncService.syncAfterDataChange();
+      }
       
       return result > 0;
     } catch (e) {

@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Allow users to read/write their own data by phone number
+    // The document ID should match the sanitized phone number
+    match /users_by_phone/{phoneNumber} {
+      allow read, write: if isAuthenticated() && 
+                           resource.data.user_id == request.auth.uid;
+    }
+    
+    // Allow users to read/write their own data by email
+    // The document ID should match the sanitized email
+    match /users_by_email/{email} {
+      allow read, write: if isAuthenticated() && 
+                           resource.data.user_id == request.auth.uid;
+    }
+    
+    // Allow users to read/write their own data by UID (fallback)
+    match /users_by_uid/{userId} {
+      allow read, write: if isAuthenticated() && 
+                           request.auth.uid == userId;
+    }
+  }
+}

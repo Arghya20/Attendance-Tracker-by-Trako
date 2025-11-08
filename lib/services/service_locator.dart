@@ -52,6 +52,9 @@ class ServiceLocator {
     _classProvider = ClassProvider();
     _studentProvider = StudentProvider();
     _attendanceProvider = AttendanceProvider();
+    
+    // Set up callback to reset providers when account switches
+    _authProvider.authService.onAccountSwitch = resetDataProviders;
   }
   
   /// Get all providers for MultiProvider
@@ -65,12 +68,11 @@ class ServiceLocator {
     ];
   }
   
-  /// Reset all providers
-  void resetProviders() {
-    _authProvider = AuthProvider();
-    _classProvider = ClassProvider();
-    _studentProvider = StudentProvider();
-    _attendanceProvider = AttendanceProvider();
+  /// Reset all data providers (used when switching accounts)
+  Future<void> resetDataProviders() async {
+    await _classProvider.reset();
+    await _studentProvider.reset();
+    await _attendanceProvider.reset();
   }
   
   /// Close all services

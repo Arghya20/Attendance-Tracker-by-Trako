@@ -274,4 +274,18 @@ class AttendanceProvider extends ChangeNotifier {
     _monthAttendanceData = null;
     notifyListeners();
   }
+  
+  /// Reset provider state (used when switching accounts)
+  Future<void> reset() async {
+    _sessions = [];
+    _selectedSession = null;
+    _records = [];
+    _attendanceWithStudentInfo = [];
+    _isLoading = false;
+    _error = null;
+    _availableMonths = [];
+    _monthAttendanceData = null;
+    notifyListeners();
+    // Note: Attendance is loaded per class, so no global reload here
+  }
 }

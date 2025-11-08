@@ -17,6 +17,7 @@ import 'package:attendance_tracker/screens/settings_screen.dart';
 import 'package:attendance_tracker/providers/auth_provider.dart';
 import 'package:attendance_tracker/services/navigation_service.dart';
 import 'package:attendance_tracker/utils/page_transitions.dart';
+import 'package:attendance_tracker/widgets/name_input_dialog.dart';
 import 'package:neopop/neopop.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -53,7 +54,41 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     // Load classes when the screen is first displayed
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ClassProvider>(context, listen: false).loadClasses();
+      _checkAndShowNameDialog();
     });
+  }
+
+  Future<void> _checkAndShowNameDialog() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+    
+    // Check if user has a display name and is authenticated via phone
+    if (user != null && 
+        (user.displayName == null || user.displayName!.isEmpty) &&
+        authProvider.hasPhoneProvider()) {
+      // Show name input dialog for phone authentication
+      final name = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const NameInputDialog(),
+      );
+
+      if (name != null && name.isNotEmpty) {
+        // Update the display name
+        try {
+          await authProvider.updateDisplayName(name);
+        } catch (e) {
+          // If updating name fails, show error
+          if (mounted) {
+            CustomSnackBar.show(
+              context: context,
+              message: 'Failed to update name: ${e.toString()}',
+              type: SnackBarType.error,
+            );
+          }
+        }
+      }
+    }
   }
   
   @override
@@ -79,6 +114,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 onTap: () => _navigateToSettings(context),
                 child: Container(
                   margin: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
                   child: CircleAvatar(
                     radius: 18,
                     backgroundImage: user?.photoURL != null

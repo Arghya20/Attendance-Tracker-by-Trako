@@ -251,4 +251,18 @@ class StudentProvider extends ChangeNotifier {
       }
     }
   }
+  
+  /// Reset provider state (used when switching accounts)
+  Future<void> reset() async {
+    _students = [];
+    _selectedStudent = null;
+    _isLoading = false;
+    _error = null;
+    _currentClassId = null;
+    _studentCache.clear();
+    _lastLoadTimeByClass.clear();
+    _invalidatedClasses.clear();
+    notifyListeners();
+    // Note: Students are loaded per class, so no global reload here
+  }
 }

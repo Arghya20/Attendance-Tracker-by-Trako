@@ -2,7 +2,11 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendance_tracker/models/user_model.dart';
+import 'package:attendance_tracker/services/cloud_sync_service.dart';
+import 'package:attendance_tracker/services/database_service.dart';
+import 'package:attendance_tracker/constants/app_constants.dart';
 
 enum AuthStatus {
   uninitialized,
@@ -14,10 +18,16 @@ enum AuthStatus {
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final CloudSyncService _cloudSyncService = CloudSyncService();
+  final DatabaseService _databaseService = DatabaseService();
   
   AuthStatus _status = AuthStatus.uninitialized;
   UserModel? _currentUser;
   String? _verificationId;
+  String? _lastUserId; // Track last logged in user
+  
+  // Callback for when account switches (to reset providers)
+  Future<void> Function()? onAccountSwitch;
   
   AuthStatus get status => _status;
   UserModel? get currentUser => _currentUser;
@@ -27,7 +37,11 @@ class AuthService extends ChangeNotifier {
     _init();
   }
   
-  void _init() {
+  void _init() async {
+    // Load last user ID from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    _lastUserId = prefs.getString('last_user_id');
+    
     _firebaseAuth.authStateChanges().listen(_onAuthStateChanged);
   }
   
@@ -35,11 +49,68 @@ class AuthService extends ChangeNotifier {
     if (firebaseUser == null) {
       _status = AuthStatus.unauthenticated;
       _currentUser = null;
+      _cloudSyncService.disableAutoSync();
     } else {
       _status = AuthStatus.authenticated;
-      _currentUser = UserModel.fromFirebaseUser(firebaseUser);
+      final newUser = UserModel.fromFirebaseUser(firebaseUser);
+      
+      // Check if this is a different user than the last one
+      bool isDifferentUser = _lastUserId != null && _lastUserId != newUser.uid;
+      
+      if (isDifferentUser) {
+        debugPrint('Different user detected (old: $_lastUserId, new: ${newUser.uid})');
+        debugPrint('Clearing local database for account switch...');
+        await _clearLocalDatabase();
+      }
+      
+      _currentUser = newUser;
+      _lastUserId = newUser.uid;
+      
+      // Save last user ID to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_user_id', newUser.uid);
+      
+      // Auto-restore data from cloud if local database is empty
+      try {
+        final restored = await _cloudSyncService.autoRestoreOnLogin(_currentUser!);
+        
+        // Reset providers if data was restored OR if different user
+        // This ensures providers reload fresh data from database
+        if ((restored || isDifferentUser) && onAccountSwitch != null) {
+          if (restored) {
+            debugPrint('Data restored from cloud for user: ${newUser.uid}');
+            debugPrint('Resetting providers to reload restored data...');
+          } else if (isDifferentUser) {
+            debugPrint('No cloud data to restore for new user: ${newUser.uid}');
+            debugPrint('Resetting providers for account switch...');
+          }
+          await onAccountSwitch!();
+        }
+        
+        // Enable automatic periodic sync
+        _cloudSyncService.enableAutoSync(_currentUser!);
+      } catch (e) {
+        debugPrint('Error in auto-restore: $e');
+      }
     }
     notifyListeners();
+  }
+  
+  /// Clear local database when switching accounts
+  Future<void> _clearLocalDatabase() async {
+    try {
+      final db = await _databaseService.database;
+      
+      // Clear all tables in reverse order due to foreign keys
+      await db.delete(AppConstants.attendanceRecordTable);
+      await db.delete(AppConstants.attendanceSessionTable);
+      await db.delete(AppConstants.studentTable);
+      await db.delete(AppConstants.classTable);
+      
+      debugPrint('Local database cleared successfully');
+    } catch (e) {
+      debugPrint('Error clearing local database: $e');
+    }
   }
   
   // Phone Authentication
@@ -171,6 +242,16 @@ class AuthService extends ChangeNotifier {
   // Sign Out
   Future<void> signOut() async {
     try {
+      // Sync data to cloud before signing out
+      if (_currentUser != null) {
+        try {
+          await _cloudSyncService.syncToCloud(_currentUser!);
+          debugPrint('Data synced to cloud before sign out');
+        } catch (e) {
+          debugPrint('Error syncing to cloud before sign out: $e');
+        }
+      }
+      
       await Future.wait([
         _firebaseAuth.signOut(),
         _googleSignIn.signOut(),
@@ -256,6 +337,38 @@ class AuthService extends ChangeNotifier {
     }
   }
   
+  // Link Google Account
+  Future<void> linkGoogleAccount() async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) throw Exception('No user signed in');
+      
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw Exception('Google sign-in cancelled');
+      }
+      
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      
+      await user.linkWithCredential(credential);
+      await user.reload();
+      
+      // Update current user model
+      final updatedUser = _firebaseAuth.currentUser;
+      if (updatedUser != null) {
+        _currentUser = UserModel.fromFirebaseUser(updatedUser);
+        notifyListeners();
+      }
+    } catch (e) {
+      throw Exception('Failed to link Google account: ${e.toString()}');
+    }
+  }
+  
   // Unlink Google Account
   Future<void> unlinkGoogleAccount() async {
     try {
@@ -316,6 +429,26 @@ class AuthService extends ChangeNotifier {
       await user.reauthenticateWithCredential(credential);
     } catch (e) {
       throw Exception('Failed to reauthenticate: ${e.toString()}');
+    }
+  }
+  
+  // Update display name
+  Future<void> updateDisplayName(String displayName) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) throw Exception('No user signed in');
+      
+      await user.updateDisplayName(displayName);
+      await user.reload();
+      
+      // Update current user model
+      final updatedUser = _firebaseAuth.currentUser;
+      if (updatedUser != null) {
+        _currentUser = UserModel.fromFirebaseUser(updatedUser);
+        notifyListeners();
+      }
+    } catch (e) {
+      throw Exception('Failed to update display name: ${e.toString()}');
     }
   }
   

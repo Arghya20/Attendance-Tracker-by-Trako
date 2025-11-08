@@ -2,11 +2,13 @@ import 'package:attendance_tracker/constants/app_constants.dart';
 import 'package:attendance_tracker/models/models.dart';
 import 'package:attendance_tracker/services/database_helper.dart';
 import 'package:attendance_tracker/services/database_service.dart';
+import 'package:attendance_tracker/services/cloud_sync_service.dart';
 import 'package:flutter/foundation.dart';
 
 class StudentRepository {
   final DatabaseService _databaseService = DatabaseService();
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final CloudSyncService _cloudSyncService = CloudSyncService();
   
   // Get all students for a class
   Future<List<Student>> getStudentsByClassId(int classId) async {
@@ -68,6 +70,9 @@ class StudentRepository {
         },
       );
       
+      // Trigger sync after data change
+      _cloudSyncService.syncAfterDataChange();
+      
       return Student(
         id: id,
         classId: classId,
@@ -96,6 +101,11 @@ class StudentRepository {
         student.id!,
       );
       
+      // Trigger sync after data change
+      if (result > 0) {
+        _cloudSyncService.syncAfterDataChange();
+      }
+      
       return result > 0;
     } catch (e) {
       debugPrint('Error updating student: $e');
@@ -107,6 +117,10 @@ class StudentRepository {
   Future<bool> deleteStudent(int id) async {
     try {
       await _databaseHelper.deleteStudent(id);
+      
+      // Trigger sync after data change
+      _cloudSyncService.syncAfterDataChange();
+      
       return true;
     } catch (e) {
       debugPrint('Error deleting student: $e');

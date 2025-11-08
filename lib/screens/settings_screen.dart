@@ -5,7 +5,9 @@ import 'package:attendance_tracker/providers/providers.dart';
 import 'package:attendance_tracker/providers/auth_provider.dart';
 import 'package:attendance_tracker/widgets/custom_snackbar.dart';
 import 'package:attendance_tracker/widgets/backup_restore_dialog.dart';
+import 'package:attendance_tracker/widgets/cloud_sync_status_card.dart';
 import 'package:attendance_tracker/widgets/link_phone_dialog.dart';
+import 'package:attendance_tracker/widgets/edit_name_dialog.dart';
 import 'package:attendance_tracker/screens/auth/login_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -77,6 +79,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 24),
+          // Cloud Sync Status
+          Consumer<AuthProvider>(
+            builder: (context, authProvider, child) {
+              if (authProvider.isAuthenticated) {
+                return Column(
+                  children: [
+                    const CloudSyncStatusCard(),
+                    const SizedBox(height: 24),
+                  ],
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           _buildSection(
             title: 'Data Management',
             children: [
@@ -345,61 +361,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
             
             // User Info Card
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundImage: user.photoURL != null
-                        ? NetworkImage(user.photoURL!)
-                        : null,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: user.photoURL == null
-                        ? Text(
-                            _getUserInitials(user),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 32,
+                        backgroundImage: user.photoURL != null
+                            ? NetworkImage(user.photoURL!)
+                            : null,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        child: user.photoURL == null
+                            ? Text(
+                                _getUserInitials(user),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.displayName ?? 'User',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.displayName ?? 'User',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                            const SizedBox(height: 4),
+                            if (user.email != null)
+                              Text(
+                                user.email!,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            if (user.phoneNumber != null)
+                              Text(
+                                user.phoneNumber!,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
                         ),
-                        if (user.email != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            user.email!,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).textTheme.bodySmall?.color,
-                            ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 20,
                           ),
-                        ],
-                        if (user.phoneNumber != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            user.phoneNumber!,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).textTheme.bodySmall?.color,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                          onPressed: () => _editName(authProvider, user.displayName),
+                          tooltip: 'Edit name',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -506,6 +539,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return 'U';
   }
 
+  Future<void> _editName(AuthProvider authProvider, String? currentName) async {
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => EditNameDialog(currentName: currentName),
+    );
+
+    if (newName != null && newName.isNotEmpty && newName != currentName) {
+      try {
+        await authProvider.updateDisplayName(newName);
+        if (mounted) {
+          CustomSnackBar.show(
+            context: context,
+            message: 'Name updated successfully',
+            type: SnackBarType.success,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          CustomSnackBar.show(
+            context: context,
+            message: 'Failed to update name: ${e.toString()}',
+            type: SnackBarType.error,
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _linkPhoneNumber() async {
     showDialog(
       context: context,
@@ -515,18 +576,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _linkGoogleAccount(AuthProvider authProvider) async {
     try {
-      await authProvider.signInWithGoogle();
-      CustomSnackBar.show(
-        context: context,
-        message: 'Google account linked successfully',
-        type: SnackBarType.success,
-      );
+      await authProvider.linkGoogleAccount();
+      if (mounted) {
+        CustomSnackBar.show(
+          context: context,
+          message: 'Google account linked successfully',
+          type: SnackBarType.success,
+        );
+      }
     } catch (e) {
-      CustomSnackBar.show(
-        context: context,
-        message: 'Failed to link Google account: ${e.toString()}',
-        type: SnackBarType.error,
-      );
+      if (mounted) {
+        CustomSnackBar.show(
+          context: context,
+          message: 'Failed to link Google account: ${e.toString()}',
+          type: SnackBarType.error,
+        );
+      }
     }
   }
 
